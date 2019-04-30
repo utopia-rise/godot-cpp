@@ -33,7 +33,7 @@ else:
 
 opts = Variables([], ARGUMENTS)
 
-opts.Add(EnumVariable('platform', 'Target platform', host_platform,
+opts.Add(EnumVariable('platform', 'Target platform', 'linux',
                     allowed_values=('linux', 'osx', 'windows', 'android', 'ios'),
                     ignorecase=2))
 opts.Add(EnumVariable('bits', 'Target platform bits', 'default', ('default', '32', '64')))
