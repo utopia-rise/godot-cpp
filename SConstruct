@@ -53,6 +53,8 @@ android_api = ARGUMENTS.get("android-api", "21")
 android_abi = ARGUMENTS.get("android-abi", "arm")
 ndk_toolchain = ARGUMENTS.get("ndk-toolchain", "/tmp/android-" + android_api + "-" + android_abi + "-toolchain")
 
+clang_path = ARGUMENTS.get("clang-path", "")
+
 unknown = opts.UnknownVariables()
 if unknown:
     print("Unknown variables:" + unknown.keys())
@@ -110,7 +112,7 @@ if env['bits'] == 'default':
 
 if env['platform'] == 'linux':
     if env['use_llvm']:
-        env['CXX'] = 'clang++'
+        env['CXX'] = clang_path + 'clang++'
 
     env.Append(CCFLAGS=['-fPIC', '-g', '-std=c++14', '-Wwrite-strings'])
     env.Append(LINKFLAGS=["-Wl,-R,'$$ORIGIN'"])
