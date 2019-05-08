@@ -48,9 +48,7 @@ opts.Add(BoolVariable('use_custom_api_file', 'Use a custom JSON API file', False
 opts.Add(PathVariable('custom_api_file', 'Path to the custom JSON API file', None, PathVariable.PathIsFile))
 opts.Add(BoolVariable('generate_bindings', 'Generate GDNative API bindings', False))
 
-clang_path = ARGUMENTS.get("clang-path", "")
-
-ndk_path = ARGUMENTS.get("ndk-path", "~/Library/android-sdks/ndk-bundle/")
+ndk_path = ARGUMENTS.get("ndk-path", os.getenv('ANDROID_NDK_ROOT', "../NDK"))
 android_api = ARGUMENTS.get("android-api", "21")
 android_abi = ARGUMENTS.get("android-abi", "arm")
 ndk_toolchain = ARGUMENTS.get("ndk-toolchain", "/tmp/android-" + android_api + "-" + android_abi + "-toolchain")
@@ -81,6 +79,7 @@ elif env['platform'] == "ios":
     IOS_PLATFORM_SDK = sys_exec(["xcode-select", "-p"]) + "/Platforms"
     env["CXX"] = sys_exec(["xcrun", "-sdk", "iphoneos", "-find", "clang++"])
 elif env['platform'] == "android":
+    sys_exec(["python", ndk_path + "/build/tools/make_standalone_toolchain.py", "--arch", android_abi, "--api", "21", "--install-dir", "/tmp/android-21-" + android_abi + "-toolchain"])
     suffix = "/bin/"
     if android_abi == "arm":
         suffix += "arm-linux-androideabi"
@@ -111,7 +110,7 @@ if env['bits'] == 'default':
 
 if env['platform'] == 'linux':
     if env['use_llvm']:
-        env['CXX'] = '%sclang++' % clang_path
+        env['CXX'] = 'clang++'
 
     env.Append(CCFLAGS=['-fPIC', '-g', '-std=c++14', '-Wwrite-strings'])
     env.Append(LINKFLAGS=["-Wl,-R,'$$ORIGIN'"])
@@ -129,8 +128,6 @@ if env['platform'] == 'linux':
         env.Append(LINKFLAGS=['-m32'])
 
 elif env['platform'] == 'osx':
-    # Use Clang on macOS by default
-    env['CXX'] = '%sclang++' % clang_path
     if env['bits'] == '32':
         raise ValueError('Only 64-bit builds are supported for the macOS target.')
 
