@@ -158,9 +158,6 @@ if (
 ):
     is64 = True
 
-if env['bits'] == 'default':
-    env['bits'] = '64' if is64 else '32'
-
 # This makes sure to keep the session environment variables on Windows.
 # This way, you can run SCons in a Visual Studio 2017 prompt and it will find
 # all the required tools
@@ -172,6 +169,9 @@ if host_platform == 'windows' and env['platform'] != 'android':
 
     opts.Update(env)
 
+if env['bits'] == 'default':
+    env['bits'] = '64' if is64 else '32'
+	
 if env['platform'] == 'linux':
     if env['use_llvm']:
         env['CXX'] = 'clang++'
