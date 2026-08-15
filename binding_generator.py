@@ -310,6 +310,23 @@ CLASS_ALIASES = {
     "ClassDB": "ClassDBSingleton",
 }
 
+# Virtual methods whose Object parameters are exposed as the raw engine pointer instead of an
+# Object * wrapper, keyed by (class name, method name).
+#
+# Decoding an Object * parameter goes through PtrToArg<T *>::convert(), which calls
+# get_object_instance_binding() and therefore builds -- and permanently registers -- a godot-cpp
+# wrapper for the object. Implementations that only need the raw pointer (a scripting language
+# binding handing the object to its own runtime, say) pay that cost on every single call and throw
+# the wrapper away immediately.
+#
+# GodotObject is `typedef void`, so PtrToArg<GodotObject *> resolves to the PtrToArg<void *>
+# specialization from GDVIRTUAL_NATIVE_PTR(void), which just reads the pointer straight out of the
+# argument slot. No other machinery needs to change: BIND_VIRTUAL_METHOD keeps working untouched.
+VIRTUAL_RAW_OBJECT_ARGS = {
+    ("ScriptExtension", "_instance_create"),
+    ("ScriptExtension", "_placeholder_instance_create"),
+}
+
 builtin_classes = []
 
 # Key is class name, value is boolean where True means the class is refcounted.
@@ -2448,6 +2465,14 @@ def make_signature(
     function_signature += "("
 
     arguments = function_data["arguments"] if "arguments" in function_data else []
+
+    if (class_name, function_data["name"]) in VIRTUAL_RAW_OBJECT_ARGS:
+        # correct_type() turns a trailing "*" into a pointer type verbatim, so this reaches the
+        # signature as "GodotObject *" without any special casing further down.
+        arguments = [
+            dict(argument, type="GodotObject*") if argument["type"] == "Object" else argument
+            for argument in arguments
+        ]
 
     if not is_vararg:
         function_signature += make_function_parameters(arguments, for_header, for_builtin, is_vararg)
