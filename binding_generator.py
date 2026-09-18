@@ -327,6 +327,15 @@ VIRTUAL_RAW_OBJECT_ARGS = {
     ("ScriptExtension", "_placeholder_instance_create"),
 }
 
+# Builtin-class methods whose Object return is generated as `GodotObject *`, the engine pointer read straight out
+# of the ptrcall return slot, instead of the `Object *` wrapper that `_call_builtin_method_ptr_ret_obj()` would
+# look up (and register) through `get_object_instance_binding()`. Same reasoning as VIRTUAL_RAW_OBJECT_ARGS: a
+# binding that tracks objects itself only needs the pointer. `get_object_id()` stays available for the id.
+BUILTIN_RAW_OBJECT_RETURNS = {
+    ("Callable", "get_object"),
+    ("Signal", "get_object"),
+}
+
 builtin_classes = []
 
 # Key is class name, value is boolean where True means the class is refcounted.
@@ -599,6 +608,10 @@ def generate_builtin_class_header(builtin_api, size, used_classes, fully_used_cl
         else:
             result.append(f"class {type_name};")
 
+    if any((class_name, method["name"]) in BUILTIN_RAW_OBJECT_RETURNS for method in builtin_api.get("methods", [])):
+        # The same typedef as classes/wrapped.hpp; repeating it keeps this header free of that include.
+        result.append("typedef void GodotObject;")
+
     if len(used_classes) > 0:
         result.append("")
 
@@ -734,7 +747,9 @@ def generate_builtin_class_header(builtin_api, size, used_classes, fully_used_cl
             if "is_static" in method and method["is_static"]:
                 method_signature += "static "
 
-            if "return_type" in method:
+            if (class_name, method["name"]) in BUILTIN_RAW_OBJECT_RETURNS:
+                method_signature += "GodotObject *"
+            elif "return_type" in method:
                 method_signature += f"{correct_type(method['return_type'])}"
                 if not method_signature.endswith("*"):
                     method_signature += " "
@@ -1209,7 +1224,9 @@ def generate_builtin_class_source(builtin_api, size, used_classes, fully_used_cl
 
             if "return_type" in method:
                 return_type = method["return_type"]
-                if is_enum(return_type):
+                if (class_name, method["name"]) in BUILTIN_RAW_OBJECT_RETURNS:
+                    method_call += "return internal::_call_builtin_method_ptr_ret<GodotObject *>("
+                elif is_enum(return_type):
                     method_call += f"return ({get_gdextension_type(correct_type(return_type))})internal::_call_builtin_method_ptr_ret<int64_t>("
                 elif is_pod_type(return_type) or is_variant(return_type):
                     method_call += f"return internal::_call_builtin_method_ptr_ret<{get_gdextension_type(correct_type(return_type))}>("
@@ -2438,7 +2455,10 @@ def make_signature(
 
     return_type = "void"
     return_meta = None
-    if "return_type" in function_data:
+    if (class_name, function_data["name"]) in BUILTIN_RAW_OBJECT_RETURNS:
+        # correct_type() keeps a trailing "*" verbatim, so this reaches the signature as "GodotObject *".
+        return_type = "GodotObject*"
+    elif "return_type" in function_data:
         return_type = correct_type(function_data["return_type"])
     elif "return_value" in function_data:
         return_type = function_data["return_value"]["type"]
